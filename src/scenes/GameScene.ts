@@ -133,7 +133,12 @@ export class GameScene extends Phaser.Scene {
       hopper.y += groundTop - body.bottom - 4;
       body.updateFromGameObject();
       this.registerEnemy(hopper);
-      this.physics.add.collider(hopper, this.groundLayer);
+      this.physics.add.collider(hopper, this.groundLayer, () => {
+        const hopperBody = hopper.body as Phaser.Physics.Arcade.Body;
+        if (hopperBody.blocked.down || hopperBody.touching.down) {
+          hopper.markGroundContact(this.time.now);
+        }
+      });
     }
 
     // 飛行型：中盤・終盤の上空をサイン波で巡回。地面とは衝突しない。
@@ -212,7 +217,15 @@ export class GameScene extends Phaser.Scene {
   /** 敵の休止状態に影響されない、実撃破ベースの残数管理。 */
   private registerEnemy(enemy: VoidCrawler): void {
     this.remainingEnemies += 1;
+    const body = enemy.body as Phaser.Physics.Arcade.Body;
+    // Physics Groupへの追加はBody設定をGroup既定値で上書きするため、
+    // 地上型の個別重力と飛行型の重力無効設定を保存して復元する。
+    const allowGravity = body.allowGravity;
+    const gravityX = body.gravity.x;
+    const gravityY = body.gravity.y;
     this.enemies.add(enemy, true);
+    body.setAllowGravity(allowGravity);
+    body.setGravity(gravityX, gravityY);
     enemy.once(Phaser.GameObjects.Events.DESTROY, () => {
       if (this.shuttingDown) return;
       this.remainingEnemies = Math.max(0, this.remainingEnemies - 1);

@@ -10,6 +10,7 @@ export class LunarHopper extends VoidCrawler {
   public chaseJumpSpeed = 94.5;
   private nextJumpAt = 0;
   private wasGrounded = false;
+  private lastGroundContactAt = Number.NEGATIVE_INFINITY;
   private readonly target: Phaser.GameObjects.Sprite;
 
   constructor(scene: Phaser.Scene, x: number, y: number, target: Phaser.GameObjects.Sprite) {
@@ -18,6 +19,10 @@ export class LunarHopper extends VoidCrawler {
     this.setTexture('hopper', 0);
     // 基底クラスの2倍表示から、さらに1.2倍へ。
     this.setScale(2.4);
+    const body = this.body as Phaser.Physics.Arcade.Body;
+    // 拡大後の寸法を即時反映してから、Scene側で足元を地面へ揃える。
+    body.updateFromGameObject();
+    body.setGravityY(this.gravity);
     this.hp = 2;
     this.nextJumpAt = scene.time.now + Phaser.Math.Between(450, 700);
   }
@@ -32,7 +37,11 @@ export class LunarHopper extends VoidCrawler {
     }
 
     const body = this.body as Phaser.Physics.Arcade.Body;
-    const grounded = this.isGrounded();
+    // Arcadeの衝突フラグは更新順によって既にリセットされるため、
+    // Colliderで記録した直前の着地も接地として扱う。
+    const grounded =
+      this.isGrounded() ||
+      (body.velocity.y >= 0 && time - this.lastGroundContactAt <= 50);
 
     if (grounded && !this.wasGrounded) {
       // 着地直後にわずかに溜め、連続ジャンプを読みやすくする。
@@ -63,6 +72,11 @@ export class LunarHopper extends VoidCrawler {
     }
 
     this.wasGrounded = grounded;
+  }
+
+  /** Tilemap Colliderから呼ばれる、更新順に依存しない着地ラッチ。 */
+  markGroundContact(time: number): void {
+    this.lastGroundContactAt = time;
   }
 }
 
