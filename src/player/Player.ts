@@ -71,7 +71,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     // PCのゲームバランスを維持したままiOS/Androidだけ穏やかにする。
     const touchDevice =
       navigator.maxTouchPoints > 0 || window.matchMedia('(pointer: coarse)').matches;
-    this.movementSpeedFactor = touchDevice ? 0.72 : 1;
+    this.movementSpeedFactor = touchDevice ? 0.7 : 1;
 
     this.bindKeys();
     this.currentState = new IdleState(this);
