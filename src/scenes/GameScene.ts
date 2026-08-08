@@ -3,6 +3,7 @@ import { Player } from '../player/Player';
 import { Projectile, ProjectileGroup, type ShotPayload } from '../projectiles/Projectile';
 import { ParallaxBackground } from '../world/ParallaxBackground';
 import { FarEarth } from '../world/FarEarth';
+import { WhiteBlackHole } from '../world/WhiteBlackHole';
 import { VoidCrawler } from '../enemies/VoidCrawler';
 import { LunarHopper } from '../enemies/LunarHopper';
 import { VoidFlyer } from '../enemies/VoidFlyer';
@@ -18,6 +19,10 @@ export class GameScene extends Phaser.Scene {
   private level: 1 | 2 = 1;
   private bgm?: Phaser.Sound.BaseSound;
   private readonly enemyActivationMargin = 420;
+  private remainingEnemies = 0;
+  private portal?: WhiteBlackHole;
+  private transitioning = false;
+  private shuttingDown = false;
 
   constructor() {
     super('GameScene');
@@ -25,6 +30,10 @@ export class GameScene extends Phaser.Scene {
 
   init(data: { level?: number }): void {
     this.level = data.level === 2 ? 2 : 1;
+    this.remainingEnemies = 0;
+    this.portal = undefined;
+    this.transitioning = false;
+    this.shuttingDown = false;
   }
 
   create(): void {
@@ -113,7 +122,7 @@ export class GameScene extends Phaser.Scene {
       const enemyVerticalOffset = -4;
       enemy.y += s.surfaceY - body.bottom + enemyVerticalOffset;
       body.updateFromGameObject();
-      this.enemies.add(enemy, true);
+      this.registerEnemy(enemy);
       this.physics.add.collider(enemy, this.groundLayer);
     }
 
@@ -123,7 +132,7 @@ export class GameScene extends Phaser.Scene {
       const body = hopper.body as Phaser.Physics.Arcade.Body;
       hopper.y += groundTop - body.bottom - 4;
       body.updateFromGameObject();
-      this.enemies.add(hopper, true);
+      this.registerEnemy(hopper);
       this.physics.add.collider(hopper, this.groundLayer);
     }
 
@@ -133,7 +142,7 @@ export class GameScene extends Phaser.Scene {
       { x: 1660, y: groundTop - 185, range: 145 },
     ]) {
       const flyer = new VoidFlyer(this, spawn.x, spawn.y, spawn.range);
-      this.enemies.add(flyer, true);
+      this.registerEnemy(flyer);
     }
 
     this.projectiles = new ProjectileGroup(this);
@@ -194,9 +203,51 @@ export class GameScene extends Phaser.Scene {
     });
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.shuttingDown = true;
       this.bgm?.stop();
       this.bgm?.destroy();
     });
+  }
+
+  /** 敵の休止状態に影響されない、実撃破ベースの残数管理。 */
+  private registerEnemy(enemy: VoidCrawler): void {
+    this.remainingEnemies += 1;
+    this.enemies.add(enemy, true);
+    enemy.once(Phaser.GameObjects.Events.DESTROY, () => {
+      if (this.shuttingDown) return;
+      this.remainingEnemies = Math.max(0, this.remainingEnemies - 1);
+      if (this.remainingEnemies === 0 && this.level === 1) this.spawnExitPortal();
+    });
+  }
+
+  /** ステージ右端へ出口を出し、触れたプレイヤーを2面へ送る。 */
+  private spawnExitPortal(): void {
+    if (this.portal || this.transitioning) return;
+
+    const worldBounds = this.physics.world.bounds;
+    this.portal = new WhiteBlackHole(this, worldBounds.right - 92, worldBounds.bottom - 214);
+    this.add
+      .text(this.portal.x, this.portal.y - 70, 'NEXT WORLD', {
+        fontFamily: 'monospace',
+        fontSize: '14px',
+        color: '#ffffff',
+        stroke: '#18364d',
+        strokeThickness: 4,
+      })
+      .setOrigin(0.5)
+      .setDepth(31);
+
+    this.physics.add.overlap(this.player, this.portal, () => this.enterNextWorld());
+    this.cameras.main.flash(260, 210, 245, 255, false);
+  }
+
+  private enterNextWorld(): void {
+    if (this.transitioning) return;
+    this.transitioning = true;
+    this.player.setVelocity(0, 0);
+    this.player.body!.enable = false;
+    this.cameras.main.fadeOut(650, 255, 255, 255);
+    this.time.delayedCall(650, () => this.scene.restart({ level: 2 }));
   }
 
   /** iOSはSound Managerのアンロック後に再試行。面番号に応じて曲を切り替える。 */
