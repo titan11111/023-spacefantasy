@@ -5,7 +5,7 @@ export class DeadState extends EnemyState {
   private until = 0;
 
   enter(): void {
-    this.play('enemy-dead');
+    this.play(this.enemy.animationKey('dead'));
     this.until = this.enemy.scene.time.now + 380;
     const body = this.enemy.body as Phaser.Physics.Arcade.Body;
     body.setVelocity(0, -Math.round(80 / Math.sqrt(6)));

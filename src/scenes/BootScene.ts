@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { createPlayerAnimations } from '../player/createPlayerAnimations';
 import { createEnemyAnimations } from '../enemies/VoidCrawler';
+import { createHopperAnimations } from '../enemies/LunarHopper';
 
 export class BootScene extends Phaser.Scene {
   constructor() {
@@ -13,6 +14,10 @@ export class BootScene extends Phaser.Scene {
       frameHeight: 64,
     });
     this.load.spritesheet('enemy', 'assets/enemy.png', {
+      frameWidth: 32,
+      frameHeight: 32,
+    });
+    this.load.spritesheet('hopper', 'assets/hopper.png', {
       frameWidth: 32,
       frameHeight: 32,
     });
@@ -41,6 +46,7 @@ export class BootScene extends Phaser.Scene {
   create(): void {
     createPlayerAnimations(this);
     createEnemyAnimations(this);
+    createHopperAnimations(this);
     this.scene.start('GameScene');
   }
 }

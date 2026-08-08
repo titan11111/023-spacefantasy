@@ -4,7 +4,7 @@ import { EnemyState } from '../EnemyState';
 /** 足場端・壁で折り返しながら左右巡回 */
 export class PatrolState extends EnemyState {
   enter(): void {
-    this.play('enemy-walk');
+    this.play(this.enemy.animationKey('walk'));
   }
 
   update(_time: number, _delta: number): void {
@@ -38,7 +38,7 @@ export class PatrolState extends EnemyState {
     }
 
     e.setFlipX(e.dir < 0);
-    this.play('enemy-walk');
+    this.play(e.animationKey('walk'));
   }
 
   exit(): void {

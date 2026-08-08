@@ -8,7 +8,7 @@ export class HurtState extends EnemyState {
   private until = 0;
 
   enter(): void {
-    this.play('enemy-hurt');
+    this.play(this.enemy.animationKey('hurt'));
     this.until = this.enemy.scene.time.now + 280;
     const body = this.enemy.body as Phaser.Physics.Arcade.Body;
     // 弾の進行方向へ水平ノックバックのみ（空中打ち上げなし）

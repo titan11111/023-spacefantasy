@@ -14,6 +14,7 @@ export class VoidCrawler extends Phaser.Physics.Arcade.Sprite {
   public dir = -1;
   public patrolSpeed = 70;
   public hp = 2;
+  public animationPrefix = 'enemy';
   /** true の敵は足場の端で反転せず、そのまま下段へ落下する。 */
   public fallsOffLedges = false;
   /** 進行方向へ何px先から足元を調べるか。 */
@@ -31,7 +32,7 @@ export class VoidCrawler extends Phaser.Physics.Arcade.Sprite {
     scene: Phaser.Scene,
     x: number,
     y: number,
-    options: { fallsOffLedges?: boolean } = {},
+    options: { fallsOffLedges?: boolean; animationPrefix?: string } = {},
   ) {
     super(scene, x, y, 'enemy', 0);
     scene.add.existing(this);
@@ -42,6 +43,7 @@ export class VoidCrawler extends Phaser.Physics.Arcade.Sprite {
     this.setBounce(0);
     this.setFlipX(true);
     this.fallsOffLedges = options.fallsOffLedges ?? false;
+    this.animationPrefix = options.animationPrefix ?? 'enemy';
     this.ledgeDebug = scene.add.graphics().setDepth(100);
 
     const body = this.body as Phaser.Physics.Arcade.Body;
@@ -69,6 +71,10 @@ export class VoidCrawler extends Phaser.Physics.Arcade.Sprite {
 
   goFall(): void {
     this.changeState(new FallState(this));
+  }
+
+  animationKey(action: string): string {
+    return `${this.animationPrefix}-${action}`;
   }
 
   isAlive(): boolean {

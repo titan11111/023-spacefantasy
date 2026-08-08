@@ -7,7 +7,7 @@ export class FallState extends EnemyState {
 
   enter(): void {
     this.enemy.clearLedgeProbe();
-    this.play('enemy-fall');
+    this.play(this.enemy.animationKey('fall'));
   }
 
   update(_time: number, _delta: number): void {
@@ -17,7 +17,7 @@ export class FallState extends EnemyState {
     // 空中でも前進速度を維持し、「端から前方へ踏み出す」軌道にする。
     body.setVelocityX(enemy.dir * enemy.patrolSpeed);
     enemy.setFlipX(enemy.dir < 0);
-    this.play('enemy-fall');
+    this.play(enemy.animationKey('fall'));
 
     if (!enemy.isGrounded()) {
       this.hasLeftGround = true;
