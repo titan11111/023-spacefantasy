@@ -99,20 +99,20 @@ const config: Phaser.Types.Core.GameConfig = {
     default: 'arcade',
     arcade: {
       gravity: { x: 0, y: 0 },
-      // 120Hz物理はiPhoneでCPU負荷が勝つため、安定性優先の60Hz固定。
-      // 描画とPointer入力は下のGame FPS設定により端末RAF上限で処理する。
+      // ProMotion端末でも物理は60Hz固定にしてCPU負荷を抑える。
       fps: 60,
       fixedStep: true,
       debug: false,
     },
   },
   fps: {
-    target: 120,
-    limit: 0,
+    // 120HzのiPhoneでも描画・更新を60FPSより増やさない。
+    target: 60,
+    limit: 60,
     forceSetTimeOut: false,
-    smoothStep: false,
-    deltaHistory: 2,
-    panicMax: 120,
+    smoothStep: true,
+    deltaHistory: 10,
+    panicMax: 60,
   },
   scene: [BootScene, GameScene],
   input: {

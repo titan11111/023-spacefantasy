@@ -17,6 +17,7 @@ export class GameScene extends Phaser.Scene {
   private groundLayer!: Phaser.Tilemaps.TilemapLayer;
   private level: 1 | 2 = 1;
   private bgm?: Phaser.Sound.BaseSound;
+  private readonly enemyActivationMargin = 420;
 
   constructor() {
     super('GameScene');
@@ -222,8 +223,40 @@ export class GameScene extends Phaser.Scene {
   }
 
   update(time: number, delta: number): void {
+    this.updateEnemyActivation();
     this.player.update(time, delta);
     this.parallax.update(this.cameras.main);
     this.farEarth.update(this.cameras.main);
+  }
+
+  /**
+   * 画面から遠い敵は物理・FSM・アニメーションを完全に休止する。
+   * 画面幅の外側に十分な余白を取るため、プレイ中に復帰が見えることはない。
+   */
+  private updateEnemyActivation(): void {
+    const view = this.cameras.main.worldView;
+    const minX = view.left - this.enemyActivationMargin;
+    const maxX = view.right + this.enemyActivationMargin;
+
+    for (const child of this.enemies.getChildren()) {
+      const enemy = child as VoidCrawler;
+      const body = enemy.body as Phaser.Physics.Arcade.Body | null;
+      if (!body || !enemy.scene) continue;
+
+      const shouldRun = enemy.x >= minX && enemy.x <= maxX;
+      const performanceCulled = enemy.getData('performanceCulled') === true;
+
+      if (!shouldRun && enemy.active) {
+        enemy.setData('performanceCulled', true);
+        body.stop();
+        body.enable = false;
+        enemy.setActive(false).setVisible(false);
+      } else if (shouldRun && performanceCulled) {
+        enemy.setData('performanceCulled', false);
+        enemy.setActive(true).setVisible(true);
+        body.enable = true;
+        body.updateFromGameObject();
+      }
+    }
   }
 }
