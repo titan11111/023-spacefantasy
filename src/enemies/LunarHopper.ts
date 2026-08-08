@@ -4,33 +4,64 @@ import { PatrolState } from './states/PatrolState';
 
 /** 地上を巡回しながら、一定間隔で月面ジャンプする敵。 */
 export class LunarHopper extends VoidCrawler {
-  public jumpInterval = 1500;
-  public jumpVelocity = -245;
+  public jumpInterval = 850;
+  public jumpVelocity = -265;
+  public chaseJumpSpeed = 135;
   private nextJumpAt = 0;
+  private wasGrounded = false;
+  private readonly target: Phaser.GameObjects.Sprite;
 
-  constructor(scene: Phaser.Scene, x: number, y: number) {
+  constructor(scene: Phaser.Scene, x: number, y: number, target: Phaser.GameObjects.Sprite) {
     super(scene, x, y, { animationPrefix: 'hopper' });
+    this.target = target;
     this.setTexture('hopper', 0);
+    // 基底クラスの2倍表示から、さらに1.2倍へ。
+    this.setScale(2.4);
     this.hp = 2;
-    this.patrolSpeed = 82;
-    this.nextJumpAt = scene.time.now + Phaser.Math.Between(650, 1100);
+    this.nextJumpAt = scene.time.now + Phaser.Math.Between(450, 700);
   }
 
   override update(time: number, delta: number): void {
-    super.update(time, delta);
-    if (!this.active || !(this.currentState instanceof PatrolState)) return;
+    if (!this.active) return;
+
+    // 被弾・死亡中は共通FSMへ任せる。
+    if (!(this.currentState instanceof PatrolState)) {
+      super.update(time, delta);
+      return;
+    }
 
     const body = this.body as Phaser.Physics.Arcade.Body;
-    if (this.isGrounded() && time >= this.nextJumpAt) {
-      body.setVelocityY(this.jumpVelocity);
-      this.nextJumpAt = time + this.jumpInterval;
+    const grounded = this.isGrounded();
+
+    if (grounded && !this.wasGrounded) {
+      // 着地直後にわずかに溜め、連続ジャンプを読みやすくする。
+      this.nextJumpAt = time + 260;
     }
 
-    // 空中で歩行アニメーションに見えないよう、静止フレームへ切り替える。
-    if (!this.isGrounded()) {
-      const key = body.velocity.y < 0 ? 'hopper-jump' : 'hopper-fall';
-      this.anims.play(key, true);
+    if (grounded) {
+      body.setVelocityX(0);
+      this.anims.play('hopper-walk', true);
+
+      if (time >= this.nextJumpAt) {
+        const distanceX = this.target.x - this.x;
+        if (Math.abs(distanceX) > 6) this.dir = distanceX < 0 ? -1 : 1;
+        this.setFlipX(this.dir < 0);
+        body.setVelocityX(this.dir * this.chaseJumpSpeed);
+        body.setVelocityY(this.jumpVelocity);
+        this.nextJumpAt = time + this.jumpInterval;
+        this.anims.play('hopper-jump', true);
+      }
+    } else {
+      // 空中では踏み切った勢いを保ち、歩行せず弧を描いて接近する。
+      if ((this.dir < 0 && body.blocked.left) || (this.dir > 0 && body.blocked.right)) {
+        this.dir *= -1;
+        body.setVelocityX(this.dir * this.chaseJumpSpeed);
+      }
+      this.setFlipX(this.dir < 0);
+      this.anims.play(body.velocity.y < 0 ? 'hopper-jump' : 'hopper-fall', true);
     }
+
+    this.wasGrounded = grounded;
   }
 }
 

@@ -126,9 +126,9 @@ export class GameScene extends Phaser.Scene {
       this.physics.add.collider(enemy, this.groundLayer);
     }
 
-    // ジャンプ型：地上を進み、約1.5秒ごとに跳ぶ。
+    // ジャンプ型：プレイヤーの方向へ飛び跳ねながら距離を詰める。
     for (const x of [720, 1510]) {
-      const hopper = new LunarHopper(this, x, groundTop);
+      const hopper = new LunarHopper(this, x, groundTop, this.player);
       const body = hopper.body as Phaser.Physics.Arcade.Body;
       hopper.y += groundTop - body.bottom - 4;
       body.updateFromGameObject();
