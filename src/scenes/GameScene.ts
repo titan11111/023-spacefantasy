@@ -19,6 +19,11 @@ export class GameScene extends Phaser.Scene {
   private level: 1 | 2 = 1;
   private bgm?: Phaser.Sound.BaseSound;
   private bgmUnlockHandler?: () => void;
+  private bgmLoaderCompleteHandler?: () => void;
+  private bgmLoadGeneration = 0;
+  private resizeHandler?: (gameSize: Phaser.Structs.Size) => void;
+  private playerShotHandler?: (payload: ShotPayload) => void;
+  private transitionTimer?: Phaser.Time.TimerEvent;
   private readonly enemyActivationMargin = 420;
   private remainingEnemies = 0;
   private portal?: WhiteBlackHole;
@@ -196,21 +201,39 @@ export class GameScene extends Phaser.Scene {
       this.player.applyHitFrom(enemy.x);
     });
 
-    this.events.on('player-shot', (payload: ShotPayload) => {
+    this.playerShotHandler = (payload: ShotPayload) => {
       this.projectiles.fire(payload);
-    });
+    };
+    this.events.on('player-shot', this.playerShotHandler);
 
     this.cameras.main.startFollow(this.player, true, 0.12, 0.12);
     this.cameras.main.setDeadzone(40, 60);
 
-    this.scale.on('resize', (gameSize: Phaser.Structs.Size) => {
+    this.resizeHandler = (gameSize: Phaser.Structs.Size) => {
       this.parallax.resize(gameSize.width, gameSize.height);
       this.farEarth.resize(gameSize.width, gameSize.height);
-    });
+    };
+    this.scale.on('resize', this.resizeHandler);
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.shuttingDown = true;
+      this.bgmLoadGeneration += 1;
       this.clearBgmUnlockHandler();
+      if (this.bgmLoaderCompleteHandler) {
+        this.load.off(Phaser.Loader.Events.COMPLETE, this.bgmLoaderCompleteHandler);
+        this.bgmLoaderCompleteHandler = undefined;
+      }
+      if (this.resizeHandler) {
+        this.scale.off('resize', this.resizeHandler);
+        this.resizeHandler = undefined;
+      }
+      if (this.playerShotHandler) {
+        this.events.off('player-shot', this.playerShotHandler);
+        this.playerShotHandler = undefined;
+      }
+      this.transitionTimer?.remove(false);
+      this.transitionTimer = undefined;
+      this.tweens.killAll();
       this.bgm?.stop();
       this.bgm?.destroy();
       this.bgm = undefined;
@@ -230,7 +253,9 @@ export class GameScene extends Phaser.Scene {
     body.setAllowGravity(allowGravity);
     body.setGravity(gravityX, gravityY);
     enemy.once(Phaser.GameObjects.Events.DESTROY, () => {
-      if (this.shuttingDown) return;
+      // Scene shutdownはGameObject破棄がこのScene自身のcleanupより先に走る。
+      // Systemsのactive状態も確認し、終了中の「全滅」誤判定を防ぐ。
+      if (this.shuttingDown || !this.sys.isActive()) return;
       this.remainingEnemies = Math.max(0, this.remainingEnemies - 1);
       if (this.remainingEnemies === 0 && this.level === 1) this.spawnExitPortal();
     });
@@ -238,7 +263,7 @@ export class GameScene extends Phaser.Scene {
 
   /** ステージ右端へ出口を出し、触れたプレイヤーを2面へ送る。 */
   private spawnExitPortal(): void {
-    if (this.portal || this.transitioning) return;
+    if (this.portal || this.transitioning || this.shuttingDown || !this.sys.isActive()) return;
 
     const worldBounds = this.physics.world.bounds;
     this.portal = new WhiteBlackHole(this, worldBounds.right - 92, worldBounds.bottom - 214);
@@ -263,18 +288,36 @@ export class GameScene extends Phaser.Scene {
     this.player.setVelocity(0, 0);
     this.player.body!.enable = false;
     this.cameras.main.fadeOut(650, 255, 255, 255);
-    this.time.delayedCall(650, () => this.scene.restart({ level: 2 }));
+    this.transitionTimer = this.time.delayedCall(650, () => {
+      this.transitionTimer = undefined;
+      if (this.shuttingDown || !this.sys.isActive()) return;
+      this.scene.restart({ level: 2 });
+    });
   }
 
   /** iOSはSound Managerのアンロック後に再試行。面番号に応じて曲を切り替える。 */
   private startBgm(): void {
     const key = this.level === 2 ? 'bgm-level2' : 'bgm-level1';
     if (!this.cache.audio.exists(key)) {
+      const generation = ++this.bgmLoadGeneration;
       this.load.audio(key, `assets/${key}.mp3`);
-      this.load.once(Phaser.Loader.Events.COMPLETE, () => this.startBgm());
+      this.bgmLoaderCompleteHandler = () => {
+        this.bgmLoaderCompleteHandler = undefined;
+        if (
+          generation !== this.bgmLoadGeneration ||
+          this.shuttingDown ||
+          !this.sys.isActive()
+        ) {
+          return;
+        }
+        this.startBgm();
+      };
+      this.load.once(Phaser.Loader.Events.COMPLETE, this.bgmLoaderCompleteHandler);
       this.load.start();
       return;
     }
+    // 同じScene内から重複して呼ばれてもSoundインスタンスを増やさない。
+    if (this.bgm) return;
     const track = this.sound.add(key, { loop: true, volume: 0.38 });
     this.bgm = track;
     const play = () => {

@@ -49,12 +49,16 @@ export class ProjectileGroup extends Phaser.Physics.Arcade.Group {
       maxSize: 40,
       runChildUpdate: true,
     });
+    // Factoryを経由せず生成するため、明示的にUpdate Listへ登録する。
+    // これがないとProjectile.updateが走らず、弾がactiveのまま残り続ける。
+    scene.sys.updateList.add(this as unknown as Phaser.GameObjects.GameObject);
   }
 
   fire(payload: ShotPayload): Projectile | null {
     const bolt = this.getFirstDead(false) as Projectile | null;
     if (!bolt) {
-      const created = this.create(payload.x, payload.y, 'projectile') as Projectile;
+      const created = this.create(payload.x, payload.y, 'projectile') as Projectile | null;
+      if (!created) return null;
       created.fire(payload.x, payload.y, payload.angle);
       return created;
     }

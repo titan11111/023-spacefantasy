@@ -5,6 +5,7 @@
 class SfxEngine {
   private ctx: AudioContext | null = null;
   private unlocked = false;
+  private noiseBuffer: AudioBuffer | null = null;
 
   private ensure(): AudioContext | null {
     if (this.ctx) return this.ctx;
@@ -62,12 +63,8 @@ class SfxEngine {
     const ctx = this.ensure();
     if (!ctx || ctx.state === 'suspended') return;
     const t0 = ctx.currentTime;
-    const len = Math.max(1, Math.floor(ctx.sampleRate * duration));
-    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
-    const data = buf.getChannelData(0);
-    for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
     const src = ctx.createBufferSource();
-    src.buffer = buf;
+    src.buffer = this.getNoiseBuffer(ctx);
     const filter = ctx.createBiquadFilter();
     filter.type = 'bandpass';
     filter.frequency.value = filterFreq;
@@ -80,6 +77,18 @@ class SfxEngine {
     gain.connect(ctx.destination);
     src.start(t0);
     src.stop(t0 + duration + 0.02);
+  }
+
+  /** 高頻度SEでAudioBufferを作り直さず、AudioContextごとに1つだけ再利用する。 */
+  private getNoiseBuffer(ctx: AudioContext): AudioBuffer {
+    if (this.noiseBuffer) return this.noiseBuffer;
+    const duration = 0.1;
+    const len = Math.max(1, Math.floor(ctx.sampleRate * duration));
+    const buffer = ctx.createBuffer(1, len, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < len; i += 1) data[i] = Math.random() * 2 - 1;
+    this.noiseBuffer = buffer;
+    return buffer;
   }
 
   /** 光線銃：ピコ・ピコ */

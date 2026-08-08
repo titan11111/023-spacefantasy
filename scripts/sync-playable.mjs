@@ -1,4 +1,5 @@
 import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync, existsSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -11,14 +12,20 @@ if (!existsSync(distIndex)) {
   process.exit(1);
 }
 
-writeFileSync(join(root, 'index.html'), readFileSync(distIndex, 'utf8'));
-
 const distAssets = join(dist, 'assets');
 const rootAssets = join(root, 'assets');
+const gameBundle = readFileSync(join(distAssets, 'game.js'));
+const bundleVersion = createHash('sha256').update(gameBundle).digest('hex').slice(0, 10);
+const playableHtml = readFileSync(distIndex, 'utf8').replace(
+  './assets/game.js',
+  `./assets/game.js?v=${bundleVersion}`,
+);
+writeFileSync(join(root, 'index.html'), playableHtml);
+
 if (existsSync(rootAssets)) {
   rmSync(rootAssets, { recursive: true, force: true });
 }
 mkdirSync(rootAssets, { recursive: true });
 cpSync(distAssets, rootAssets, { recursive: true });
 
-console.log('Synced playable files → index.html + assets/');
+console.log(`Synced playable files → index.html + assets/ (${bundleVersion})`);

@@ -39,6 +39,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   public jumpBufferedAt = -Infinity;
   public wasGrounded = false;
   public invulnUntil = 0;
+  private readonly movementSpeedFactor: number;
 
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private keyA!: Phaser.Input.Keyboard.Key;
@@ -65,6 +66,12 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.setBounce(0);
     this.setDragX(900);
     this.setDepth(20);
+
+    // 小さいタッチ画面では同じpx/秒でも画面横断が速く見えるため、
+    // PCのゲームバランスを維持したままiOS/Androidだけ穏やかにする。
+    const touchDevice =
+      navigator.maxTouchPoints > 0 || window.matchMedia('(pointer: coarse)').matches;
+    this.movementSpeedFactor = touchDevice ? 0.72 : 1;
 
     this.bindKeys();
     this.currentState = new IdleState(this);
@@ -140,7 +147,6 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     const shoot =
       this.keyJ?.isDown ||
       this.keyX?.isDown ||
-      this.scene.input.activePointer.leftButtonDown() ||
       false;
 
     this.playerInput = this.inputController.applyKeyboard(
@@ -183,11 +189,12 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
 
   applyHorizontalMove(input: PlayerInput, speed: number): void {
     const body = this.body as Phaser.Physics.Arcade.Body;
+    const adjustedSpeed = speed * this.movementSpeedFactor;
     if (input.left && !input.right) {
-      body.setVelocityX(-speed);
+      body.setVelocityX(-adjustedSpeed);
       this.setFlipX(true);
     } else if (input.right && !input.left) {
-      body.setVelocityX(speed);
+      body.setVelocityX(adjustedSpeed);
       this.setFlipX(false);
     } else {
       body.setVelocityX(0);
