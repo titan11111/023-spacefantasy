@@ -18,6 +18,7 @@ export class GameScene extends Phaser.Scene {
   private groundLayer!: Phaser.Tilemaps.TilemapLayer;
   private level: 1 | 2 = 1;
   private bgm?: Phaser.Sound.BaseSound;
+  private bgmUnlockHandler?: () => void;
   private readonly enemyActivationMargin = 420;
   private remainingEnemies = 0;
   private portal?: WhiteBlackHole;
@@ -209,8 +210,10 @@ export class GameScene extends Phaser.Scene {
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.shuttingDown = true;
+      this.clearBgmUnlockHandler();
       this.bgm?.stop();
       this.bgm?.destroy();
+      this.bgm = undefined;
     });
   }
 
@@ -272,18 +275,33 @@ export class GameScene extends Phaser.Scene {
       this.load.start();
       return;
     }
-    this.bgm = this.sound.add(key, { loop: true, volume: 0.38 });
+    const track = this.sound.add(key, { loop: true, volume: 0.38 });
+    this.bgm = track;
     const play = () => {
-      if (this.bgm && !this.bgm.isPlaying) this.bgm.play();
+      this.clearBgmUnlockHandler();
+      // Scene再起動後に古いコールバックが残っても、破棄済み音源は再生しない。
+      if (this.shuttingDown || this.bgm !== track || track.isPlaying) return;
+      track.play();
     };
 
     if (this.sound.locked) {
+      this.bgmUnlockHandler = play;
       this.sound.once(Phaser.Sound.Events.UNLOCKED, play);
       this.input.once(Phaser.Input.Events.POINTER_DOWN, play);
       this.input.keyboard?.once(Phaser.Input.Keyboard.Events.ANY_KEY_DOWN, play);
     } else {
       play();
     }
+  }
+
+  /** Sound ManagerはScene外でも生存するため、再起動前に登録を明示解除する。 */
+  private clearBgmUnlockHandler(): void {
+    const handler = this.bgmUnlockHandler;
+    if (!handler) return;
+    this.sound.off(Phaser.Sound.Events.UNLOCKED, handler);
+    this.input.off(Phaser.Input.Events.POINTER_DOWN, handler);
+    this.input.keyboard?.off(Phaser.Input.Keyboard.Events.ANY_KEY_DOWN, handler);
+    this.bgmUnlockHandler = undefined;
   }
 
   update(time: number, delta: number): void {
