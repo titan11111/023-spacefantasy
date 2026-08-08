@@ -112,6 +112,8 @@
         -webkit-user-select: none;
         user-select: none;
         cursor: pointer;
+        will-change: transform;
+        contain: layout paint style;
         transition:
           transform 38ms cubic-bezier(0.2, 0.8, 0.2, 1),
           box-shadow 38ms linear,
@@ -255,6 +257,13 @@
       @media (max-width: 699px) {
         .system-buttons {
           display: none;
+        }
+      }
+
+      /* iOS/タッチ端末は補間を挟まず、押したフレームで即座に沈める。 */
+      @media (pointer: coarse) {
+        #virtual-controls button {
+          transition: none;
         }
       }
 

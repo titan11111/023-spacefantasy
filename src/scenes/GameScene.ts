@@ -13,12 +13,19 @@ export class GameScene extends Phaser.Scene {
   private parallax!: ParallaxBackground;
   private farEarth!: FarEarth;
   private groundLayer!: Phaser.Tilemaps.TilemapLayer;
+  private level: 1 | 2 = 1;
+  private bgm?: Phaser.Sound.BaseSound;
 
   constructor() {
     super('GameScene');
   }
 
+  init(data: { level?: number }): void {
+    this.level = data.level === 2 ? 2 : 1;
+  }
+
   create(): void {
+    this.startBgm();
     // 地面・足場・キャラを上げる量。背景パララックス／地球は動かさない。
     // 端末表示でおよそ 2cm 相当（CSS換算 ≈75px → タイル整合で 64）
     const STAGE_RAISE = 64;
@@ -151,6 +158,34 @@ export class GameScene extends Phaser.Scene {
       this.parallax.resize(gameSize.width, gameSize.height);
       this.farEarth.resize(gameSize.width, gameSize.height);
     });
+
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.bgm?.stop();
+      this.bgm?.destroy();
+    });
+  }
+
+  /** iOSはSound Managerのアンロック後に再試行。面番号に応じて曲を切り替える。 */
+  private startBgm(): void {
+    const key = this.level === 2 ? 'bgm-level2' : 'bgm-level1';
+    if (!this.cache.audio.exists(key)) {
+      this.load.audio(key, `assets/${key}.mp3`);
+      this.load.once(Phaser.Loader.Events.COMPLETE, () => this.startBgm());
+      this.load.start();
+      return;
+    }
+    this.bgm = this.sound.add(key, { loop: true, volume: 0.38 });
+    const play = () => {
+      if (this.bgm && !this.bgm.isPlaying) this.bgm.play();
+    };
+
+    if (this.sound.locked) {
+      this.sound.once(Phaser.Sound.Events.UNLOCKED, play);
+      this.input.once(Phaser.Input.Events.POINTER_DOWN, play);
+      this.input.keyboard?.once(Phaser.Input.Keyboard.Events.ANY_KEY_DOWN, play);
+    } else {
+      play();
+    }
   }
 
   update(time: number, delta: number): void {

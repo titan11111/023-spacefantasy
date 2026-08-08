@@ -112,6 +112,8 @@
         -webkit-user-select: none;
         user-select: none;
         cursor: pointer;
+        will-change: transform;
+        contain: layout paint style;
         transition:
           transform 38ms cubic-bezier(0.2, 0.8, 0.2, 1),
           box-shadow 38ms linear,
@@ -258,6 +260,13 @@
         }
       }
 
+      /* iOS/タッチ端末は補間を挟まず、押したフレームで即座に沈める。 */
+      @media (pointer: coarse) {
+        #virtual-controls button {
+          transition: none;
+        }
+      }
+
       @media (max-height: 420px) {
         #virtual-controls {
           height: 126px;
@@ -269,12 +278,7 @@
       }
     </style>
     <script type="module" crossorigin src="./assets/game.js"></script>
-      <meta property="og:title" content="Cosmic Runner">
-    <meta property="og:description" content="スマホ・PCのブラウザで遊べる無料ゲームです。インストール不要！">
-    <meta property="og:url" content="https://titan11111.github.io/023-spacefantasy/">
-    <meta property="og:type" content="website">
-    <meta name="twitter:card" content="summary">
-</head>
+  </head>
   <body>
     <main id="game-container" aria-label="Cosmic Runner game"></main>
     <nav id="virtual-controls" aria-label="ゲーム操作">

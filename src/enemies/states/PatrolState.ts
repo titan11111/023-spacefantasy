@@ -14,20 +14,34 @@ export class PatrolState extends EnemyState {
 
     body.setVelocityX(e.dir * e.patrolSpeed);
 
+    // Probe判定を物理フレーム間で取り逃しても、空中でPatrolを継続させない。
+    if (!e.isGrounded() && e.fallsOffLedges) {
+      e.goFall();
+      return;
+    }
+
     // 壁
     if ((e.dir < 0 && body.blocked.left) || (e.dir > 0 && body.blocked.right)) {
       e.flipDir();
       return;
     }
 
-    // 崖（進行方向の足元1タイル先が空）
-    if (e.isGrounded() && !e.fallsOffLedges && e.isLedgeAhead()) {
-      e.flipDir();
+    // 前方足元のLine Probeが地面を見失ったら崖。
+    if (e.isGrounded() && !e.hasGroundAhead()) {
+      if (e.fallsOffLedges) {
+        // 速度は反転させず、現在方向のまま落下Stateへ。
+        e.goFall();
+        return;
+      } else {
+        e.flipDir();
+      }
     }
 
     e.setFlipX(e.dir < 0);
     this.play('enemy-walk');
   }
 
-  exit(): void {}
+  exit(): void {
+    this.enemy.clearLedgeProbe();
+  }
 }

@@ -24,6 +24,7 @@ export class BootScene extends Phaser.Scene {
     this.load.image('bg_stars', 'assets/bg_stars.png');
     this.load.image('bg_earth', 'assets/bg_earth.png');
     this.load.image('ground_face', 'assets/ground_face.png');
+    this.load.audio('bgm-level1', 'assets/bgm-level1.mp3');
 
     const { width, height } = this.scale;
     const bar = this.add.rectangle(width / 2, height / 2, 240, 12, 0x12324a).setOrigin(0.5);

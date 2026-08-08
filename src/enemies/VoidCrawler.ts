@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { EnemyState } from './EnemyState';
 import { PatrolState } from './states/PatrolState';
 import { HurtState } from './states/HurtState';
+import { FallState } from './states/FallState';
 
 /**
  * Void Crawler — モデルケース敵
@@ -15,9 +16,16 @@ export class VoidCrawler extends Phaser.Physics.Arcade.Sprite {
   public hp = 2;
   /** true の敵は足場の端で反転せず、そのまま下段へ落下する。 */
   public fallsOffLedges = false;
+  /** 進行方向へ何px先から足元を調べるか。 */
+  public ledgeCheckOffset = 20;
+  /** 足元チェックを下へ何px伸ばすか。 */
+  public ledgeCheckDepth = 34;
+  /** 開発確認用。必要なときだけ true にする。 */
+  public debugLedgeProbe = false;
   /** プレイヤーと同じ月面重力（地球相当980の1/6） */
   public gravity = Math.round(980 / 6);
   private invulnUntil = 0;
+  private ledgeDebug!: Phaser.GameObjects.Graphics;
 
   constructor(
     scene: Phaser.Scene,
@@ -34,6 +42,7 @@ export class VoidCrawler extends Phaser.Physics.Arcade.Sprite {
     this.setBounce(0);
     this.setFlipX(true);
     this.fallsOffLedges = options.fallsOffLedges ?? false;
+    this.ledgeDebug = scene.add.graphics().setDepth(100);
 
     const body = this.body as Phaser.Physics.Arcade.Body;
     body.setCollideWorldBounds(true);
@@ -54,6 +63,14 @@ export class VoidCrawler extends Phaser.Physics.Arcade.Sprite {
     this.currentState.enter();
   }
 
+  goPatrol(): void {
+    this.changeState(new PatrolState(this));
+  }
+
+  goFall(): void {
+    this.changeState(new FallState(this));
+  }
+
   isAlive(): boolean {
     return this.hp > 0 && this.active;
   }
@@ -68,15 +85,41 @@ export class VoidCrawler extends Phaser.Physics.Arcade.Sprite {
     this.setFlipX(this.dir < 0);
   }
 
-  /** 進行方向の少し先・足元下に地面が無ければ崖 */
-  isLedgeAhead(): boolean {
+  /**
+   * 進行方向の前方足元へLine Probeを伸ばす。
+   * Arcade PhysicsにはMatterのworld.raycast相当がないため、線上を分割し
+   * Tilemapの衝突タイルに当たるか調べて同じ判定を行う。
+   */
+  hasGroundAhead(): boolean {
     const body = this.body as Phaser.Physics.Arcade.Body;
-    const probeX = this.x + this.dir * (body.width * this.scaleX * 0.55 + 4);
-    const probeY = body.bottom + 4;
-    const map = this.scene.data.get('groundLayer') as Phaser.Tilemaps.TilemapLayer | undefined;
-    if (!map) return false;
-    const tile = map.getTileAtWorldXY(probeX, probeY, true);
-    return !tile || tile.index <= 0;
+    const startX = body.center.x + this.dir * this.ledgeCheckOffset;
+    const startY = body.bottom - 6;
+    const endX = startX + this.dir * 8;
+    const endY = body.bottom + this.ledgeCheckDepth;
+    const layer = this.scene.data.get('groundLayer') as
+      | Phaser.Tilemaps.TilemapLayer
+      | undefined;
+
+    this.ledgeDebug.clear();
+    if (this.debugLedgeProbe) {
+      this.ledgeDebug.lineStyle(2, 0xff3344, 0.9);
+      this.ledgeDebug.lineBetween(startX, startY, endX, endY);
+    }
+    if (!layer) return false;
+
+    const samples = 10;
+    for (let i = 0; i <= samples; i += 1) {
+      const t = i / samples;
+      const x = Phaser.Math.Linear(startX, endX, t);
+      const y = Phaser.Math.Linear(startY, endY, t);
+      const tile = layer.getTileAtWorldXY(x, y, true);
+      if (tile && tile.index > 0 && tile.collides) return true;
+    }
+    return false;
+  }
+
+  clearLedgeProbe(): void {
+    this.ledgeDebug.clear();
   }
 
   /** ノックバック水平方向（+1=右へ、-1=左へ）。弾の進行方向と同じ。 */
@@ -99,6 +142,11 @@ export class VoidCrawler extends Phaser.Physics.Arcade.Sprite {
     if (!this.active) return;
     this.currentState.update(time, delta);
   }
+
+  override destroy(fromScene?: boolean): void {
+    this.ledgeDebug?.destroy();
+    super.destroy(fromScene);
+  }
 }
 
 export function createEnemyAnimations(scene: Phaser.Scene): void {
@@ -113,6 +161,13 @@ export function createEnemyAnimations(scene: Phaser.Scene): void {
 
   scene.anims.create({
     key: 'enemy-idle',
+    frames: scene.anims.generateFrameNumbers('enemy', { start: 3, end: 3 }),
+    frameRate: 1,
+    repeat: -1,
+  });
+
+  scene.anims.create({
+    key: 'enemy-fall',
     frames: scene.anims.generateFrameNumbers('enemy', { start: 3, end: 3 }),
     frameRate: 1,
     repeat: -1,

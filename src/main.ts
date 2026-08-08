@@ -20,7 +20,9 @@ function preventIosChrome(): void {
 }
 
 function unlockAudioOnce(): void {
-  const unlock = () => Sfx.unlock();
+  const unlock = () => {
+    Sfx.unlock();
+  };
   document.addEventListener('pointerdown', unlock, { once: true });
   document.addEventListener('keydown', unlock, { once: true });
   document.addEventListener('touchstart', unlock, { once: true });
@@ -30,11 +32,12 @@ function bindPointer(el: HTMLElement, codes: string[]): void {
   const down = (e: PointerEvent) => {
     e.preventDefault();
     el.setPointerCapture(e.pointerId);
-    Sfx.unlock();
-    Sfx.buttonPress();
+    // 最優先でCommandを立てる。音・見た目の処理より先にFSMへ渡す。
+    for (const code of codes) virtualPad[code] = true;
     el.classList.add('is-pressed');
     el.setAttribute('aria-pressed', 'true');
-    for (const code of codes) virtualPad[code] = true;
+    Sfx.unlock();
+    Sfx.buttonPress();
   };
   const up = () => {
     el.classList.remove('is-pressed');
@@ -96,8 +99,20 @@ const config: Phaser.Types.Core.GameConfig = {
     default: 'arcade',
     arcade: {
       gravity: { x: 0, y: 0 },
+      // 120Hz物理はiPhoneでCPU負荷が勝つため、安定性優先の60Hz固定。
+      // 描画とPointer入力は下のGame FPS設定により端末RAF上限で処理する。
+      fps: 60,
+      fixedStep: true,
       debug: false,
     },
+  },
+  fps: {
+    target: 120,
+    limit: 0,
+    forceSetTimeOut: false,
+    smoothStep: false,
+    deltaHistory: 2,
+    panicMax: 120,
   },
   scene: [BootScene, GameScene],
   input: {
