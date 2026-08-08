@@ -4,6 +4,8 @@ import { Projectile, ProjectileGroup, type ShotPayload } from '../projectiles/Pr
 import { ParallaxBackground } from '../world/ParallaxBackground';
 import { FarEarth } from '../world/FarEarth';
 import { VoidCrawler } from '../enemies/VoidCrawler';
+import { LunarHopper } from '../enemies/LunarHopper';
+import { VoidFlyer } from '../enemies/VoidFlyer';
 import { Sfx } from '../audio/Sfx';
 
 export class GameScene extends Phaser.Scene {
@@ -77,15 +79,27 @@ export class GameScene extends Phaser.Scene {
     this.physics.add.collider(this.player, this.groundLayer);
 
     this.enemies = this.physics.add.group({ runChildUpdate: true });
-    // モデルケース: 地面に2体、足場に1体。
+    // 地上・足場の敵をステージ中盤〜終盤まで広く配置。
     // Sprite の見た目ではなく Arcade Body の底面をタイル表面へ揃え、
     // 最初の物理フレームで敵が空中から落ちて見えるのを防ぐ。
     const crawlerSpawns = [
-      { x: 420, surfaceY: groundTop, fallsOffLedges: false },
-      { x: 780, surfaceY: groundTop, fallsOffLedges: false },
+      { x: 520, surfaceY: groundTop, fallsOffLedges: false },
+      { x: 920, surfaceY: groundTop, fallsOffLedges: false },
+      { x: 1360, surfaceY: groundTop, fallsOffLedges: false },
+      { x: 1740, surfaceY: groundTop, fallsOffLedges: false },
       {
         x: 400,
         surfaceY: 12 * map.tileHeight - STAGE_RAISE,
+        fallsOffLedges: true,
+      },
+      {
+        x: 1210,
+        surfaceY: 13 * map.tileHeight - STAGE_RAISE,
+        fallsOffLedges: true,
+      },
+      {
+        x: 1640,
+        surfaceY: 11 * map.tileHeight - STAGE_RAISE,
         fallsOffLedges: true,
       },
     ];
@@ -100,6 +114,25 @@ export class GameScene extends Phaser.Scene {
       body.updateFromGameObject();
       this.enemies.add(enemy, true);
       this.physics.add.collider(enemy, this.groundLayer);
+    }
+
+    // ジャンプ型：地上を進み、約1.5秒ごとに跳ぶ。
+    for (const x of [720, 1510]) {
+      const hopper = new LunarHopper(this, x, groundTop);
+      const body = hopper.body as Phaser.Physics.Arcade.Body;
+      hopper.y += groundTop - body.bottom - 4;
+      body.updateFromGameObject();
+      this.enemies.add(hopper, true);
+      this.physics.add.collider(hopper, this.groundLayer);
+    }
+
+    // 飛行型：中盤・終盤の上空をサイン波で巡回。地面とは衝突しない。
+    for (const spawn of [
+      { x: 1080, y: groundTop - 150, range: 170 },
+      { x: 1660, y: groundTop - 185, range: 145 },
+    ]) {
+      const flyer = new VoidFlyer(this, spawn.x, spawn.y, spawn.range);
+      this.enemies.add(flyer, true);
     }
 
     this.projectiles = new ProjectileGroup(this);
