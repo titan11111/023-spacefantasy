@@ -17,8 +17,8 @@ export class LunarHopper extends VoidCrawler {
     super(scene, x, y, { animationPrefix: 'hopper' });
     this.target = target;
     this.setTexture('hopper', 0);
-    // 基底クラスの2倍表示から、さらに1.2倍へ。
-    this.setScale(2.4);
+    // 通常敵（scale 2.0）の130%で表示する。
+    this.setScale(2.6);
     const body = this.body as Phaser.Physics.Arcade.Body;
     // 拡大後の寸法を即時反映してから、Scene側で足元を地面へ揃える。
     body.updateFromGameObject();
