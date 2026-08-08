@@ -6,7 +6,8 @@ import { PatrolState } from './states/PatrolState';
 export class LunarHopper extends VoidCrawler {
   public jumpInterval = 850;
   public jumpVelocity = -265;
-  public chaseJumpSpeed = 135;
+  // 追跡ジャンプの横移動は従来速度135の0.7倍。
+  public chaseJumpSpeed = 94.5;
   private nextJumpAt = 0;
   private wasGrounded = false;
   private readonly target: Phaser.GameObjects.Sprite;
